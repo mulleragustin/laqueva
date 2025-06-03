@@ -1,0 +1,70 @@
+---
+import Layout from "../layouts/Layout.astro";
+import "../styles/global.css"; // Aquí se importa el CSS global
+import Logo from "../components/LaQueVaLogo.jsx";
+import LogoTiny from "../assets/tiny2.svg";
+import PizzaSlider from "../components/PizzaSlider.jsx";
+import Estado from "../components/Estado.jsx";
+---
+
+<Layout>
+  <div class="flex flex-col font-sora">
+    {/* Primera sección - Logo */}
+    <section class="min-h-screen flex flex-col justify-start md:justify-center pt-7 items-center">
+      <Logo client:visible/>
+      <div class="text-center">
+        <h1 class="text-xl sm:text-4xl font-sora text-gray-800 mb-4">
+          Bienvenido a<br />La Que Va
+        </h1>
+        <p class="text-gray-600 mb-8">
+          Las mejores pizzas de Resistencia, Chaco
+        </p>
+      </div>
+      <Estado client:load />
+      <div
+        class="animate-bounce flex items-center justify-center mt-10"
+      >
+        <svg
+          class="w-8 h-8 mx-auto text-red-600"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M19 14l-7 7m0 0l-7-7m7 7V3"></path>
+        </svg>
+      </div>
+    </section>
+
+    {/* Segunda sección - Pizzas */}
+    <section class="py-16 bg-yellow-50">
+      <div class="container mx-auto px-4">
+        <PizzaSlider client:load />
+      </div>
+    </section>
+
+    {/* Tercera sección - Footer */}
+    <section class="sm:py-16">
+      <div class="flex flex-col items-center w-full">
+        <div class="flex-col mb-8 mx-8">
+          <a
+            href="http://tinystudioar.com"
+            target="_blank"
+            class="block mx-auto"
+          >
+            <img src="/tiny2.svg" alt="Tiny Studio" class="w-64 sm:w-100 h-auto" />
+          </a>
+        </div>
+        <div class="flex-col text-center p-2">
+          <p>
+            © {new Date().getFullYear()} La Que Va. Todos los derechos reservados
+          </p>
+        </div>
+      </div>
+    </section>
+  </div>
+</Layout>
+

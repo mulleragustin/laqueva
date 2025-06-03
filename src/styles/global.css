@@ -1,0 +1,48 @@
+@import "tailwindcss";
+
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  overflow-x: hidden;
+}
+
+.snap-y {
+  scroll-snap-type: y mandatory;
+  scroll-behavior: smooth; 
+}
+
+.snap-start {
+  scroll-snap-align: start;
+}
+
+.snap-y {
+  scroll-snap-type: y mandatory;
+  scroll-snap-stop: always; 
+
+}
+
+.scrollbar-hide {
+  -ms-overflow-style: none; 
+  scrollbar-width: none;  
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+.font-sora{
+  font-family: 'Sora', sans-serif;
+ 
+}
+
+.font-unbounded {
+  font-family: 'Unbounded';
+}
+
+.font-rubik-wet {
+  font-family: 'Rubik Wet Paint', sans-serif;
+  font-weight: 400;
+}

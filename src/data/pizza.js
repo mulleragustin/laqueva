@@ -1,0 +1,51 @@
+export const pizza = [
+  {
+    id: 1,
+    nombre: "MUZZARELLA",
+    ingredientes: ["Salsa", "muzza", "oregano"],
+    precio: 5500,
+    imagen: "pizza.png",
+  },
+  {
+    id: 2,
+    nombre: "MUZZA CON JAMON",
+    ingredientes: ["Salsa", "muzza", "jamon", "oregano"],
+    precio: 6000,
+    imagen: "pizza.png",
+  },
+  {
+    id: 3,
+    nombre: "FUGAZZETA",
+    ingredientes: ["Salsa", "muzza", "cebolla", "oregano"],
+    precio: 6500,
+    imagen: "pizza.png",
+  },
+  {
+    id: 4,
+    nombre: "NAPOLITANA",
+    ingredientes: ["Salsa", "muzza", "tomates", "oregano", "aceite de ajo"],
+    precio: 6500,
+    imagen: "pizza.png",
+  },
+  {
+    id: 5,
+    nombre: "NAPO CON JAMON",
+    ingredientes: ["Salsa", "muzza", "jamon", "tomates", "oregano"],
+    precio: 7000,
+    imagen: "pizza.png",
+  },
+  {
+    id: 6,
+    nombre: "FUGA CON JAMON",
+    ingredientes: ["Salsa", "muzza", "jamon", "cebolla", "oregano"],
+    precio: 7000,
+    imagen: "pizza.png",
+  },
+  {
+    id: 7,
+    nombre: "ESPECIAL",
+    ingredientes: ["Salsa", "muzza", "jamon", "tomates", "cebolla", "oregano"],
+    precio: 7000,
+    imagen: "pizza.png",
+  },
+];

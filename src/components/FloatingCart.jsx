@@ -10,17 +10,15 @@ export default function FloatingCart() {
   
   const { items, isOpen, totalItems, totalPrice, dispatch } = useCart();
 
-  // Este efecto controla el scroll cuando el carrito está abierto
+
   useEffect(() => {
     if (isOpen) {
-      // Bloquear el scroll
       document.body.style.overflow = 'hidden';
-      // Almacenar la posición actual del scroll
       document.body.style.position = 'fixed';
       document.body.style.width = '100%';
       document.body.style.top = `-${window.scrollY}px`;
     } else {
-      // Recuperar la posición del scroll
+
       const scrollY = document.body.style.top;
       document.body.style.position = '';
       document.body.style.overflow = '';
@@ -29,7 +27,7 @@ export default function FloatingCart() {
       window.scrollTo(0, parseInt(scrollY || '0') * -1);
     }
     
-    // Limpiar en desmontaje
+
     return () => {
       document.body.style.overflow = '';
       document.body.style.position = '';
@@ -60,7 +58,7 @@ export default function FloatingCart() {
   
   const sendWhatsAppOrder = () => {
     // Número de WhatsApp (agregando el código de país)
-    const phoneNumber = "5493624384200"; // Reemplaza este número con el número de WhatsApp real
+    const phoneNumber = "5493624751290"; // Reemplaza este número con el número de WhatsApp real
     
     // Construir el mensaje
     let message = "🍕 *NUEVO PEDIDO - LA QUE VA* 🍕\n\n";

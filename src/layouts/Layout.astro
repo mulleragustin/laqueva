@@ -1,25 +1,54 @@
+
 <!doctype html>
-<html lang="eS">
-	<head>
-		<meta charset="UTF-8" />
-		<meta name="viewport" content="width=device-width" />
-		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-		<meta name="generator" content={Astro.generator} />
-		<link rel="preconnect" href="https://fonts.googleapis.com">
-		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-		<link href="https://fonts.googleapis.com/css2?family=Rubik+Wet+Paint&family=Sora:wght@100..800&family=Unbounded:wght@200..900&display=swap" rel="stylesheet">
-		<title>La que va</title>
-	</head>
-	<body class="flex justify-center min-h-screen bg-yellow-50">
-		<slot />
-	</body>
+<html lang="es">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        
+        <!-- Favicons -->
+        <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+        <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+        <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+        <link rel="manifest" href="/site.webmanifest">
+        <link rel="shortcut icon" href="/favicon.ico">
+        
+        <!-- Meta tags -->
+        <meta name="generator" content={Astro.generator} />
+        <meta name="description" content="La Que Va - Las mejores pizzas de Resistencia, Chaco. Pedí online y recibí en tu casa o retirá por nuestro local en Paseo Sur.">
+        <meta name="keywords" content="pizza, resistencia, chaco, delivery, pedidos online, la que va">
+        <meta name="author" content="La Que Va Pizzería">
+        
+        <!-- Open Graph / Facebook -->
+        <meta property="og:type" content="website">
+        <meta property="og:url" content="https://laqueva.com">
+        <meta property="og:title" content="La Que Va - Pizzería">
+        <meta property="og:description" content="Las mejores pizzas de Resistencia, Chaco">
+        <meta property="og:image" content="/android-chrome-512x512.png">
+        
+        <!-- Twitter -->
+        <meta property="twitter:card" content="summary_large_image">
+        <meta property="twitter:url" content="https://laqueva.com">
+        <meta property="twitter:title" content="La Que Va - Pizzería">
+        <meta property="twitter:description" content="Las mejores pizzas de Resistencia, Chaco">
+        <meta property="twitter:image" content="/android-chrome-512x512.png">
+        
+        <!-- Fonts -->
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link href="https://fonts.googleapis.com/css2?family=Rubik+Wet+Paint&family=Sora:wght@100..800&family=Unbounded:wght@200..900&display=swap" rel="stylesheet">
+        
+        <title>La Que Va - Pizzería Online</title>
+    </head>
+    <body class="flex justify-center min-h-screen bg-yellow-50">
+        <slot />
+    </body>
 </html>
 
 <style>
-	html,
-	body {
-		margin: 0;	
-		width: 100%;
-		height: 100%;
-	}
+    html,
+    body {
+        margin: 0;	
+        width: 100%;
+        height: 100%;
+    }
 </style>

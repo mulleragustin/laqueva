@@ -9,13 +9,12 @@ export default function EstadoDePedidos() {
   const [estado, setEstado] = useState("cargando");
   const [isClient, setIsClient] = useState(false);
 
-  // Verificar que estamos en el cliente
   useEffect(() => {
     setIsClient(true);
   }, []);
 
   useEffect(() => {
-    if (!isClient) return; // No ejecutar en servidor
+    if (!isClient) return;
 
     console.log("Estado component mounted");
     console.log("DB instance:", db);
@@ -23,7 +22,6 @@ export default function EstadoDePedidos() {
     const docRef = doc(db, "config", "estado");
     console.log("DocRef created:", docRef);
 
-    // 1) Traer valor inicial
     getDoc(docRef)
       .then((docSnap) => {
         console.log("getDoc resolved:", docSnap.exists());
@@ -40,7 +38,6 @@ export default function EstadoDePedidos() {
         setEstado("error");
       });
 
-    // 2) Suscribirse a cambios
     const unsub = onSnapshot(
       docRef,
       (docSnap) => {
@@ -115,7 +112,7 @@ export default function EstadoDePedidos() {
           </motion.a>
 
           <motion.a
-            href="https://wa.me/5493624384200?text=Hola,%20quiero%20estar%20en%20el%20grupo%20de%20whatsapp"
+            href="https://wa.me/5493624751290?text=Hola,%20quiero%20estar%20en%20el%20grupo%20de%20whatsapp"
             target="_blank"
             rel="noopener noreferrer"
             whileHover={{ scale: 1.2, rotate: -180 }}
@@ -141,7 +138,7 @@ export default function EstadoDePedidos() {
     <>
       <div className="text-orange-500">Estado desconocido: {estado}</div>
       <a
-        href="https://wa.me/5493624384200"
+        href="https://wa.me/5493624751290"
         target="_blank"
         rel="noopener noreferrer"
         className="text-green-600 hover:text-green-800 transition-colors"

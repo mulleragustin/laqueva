@@ -1,24 +1,114 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { useCart } from "../context/CartContext";
-import { FaShoppingCart, FaTimes, FaPlus, FaMinus, FaWhatsapp } from "react-icons/fa";
-import { useState, useEffect } from "react";
+import { FaShoppingCart, FaTimes, FaPlus, FaMinus, FaWhatsapp, FaMapMarkerAlt } from "react-icons/fa";
+import { useState, useEffect, useRef } from "react";
 
 export default function FloatingCart() {
   const [metodoEntrega, setMetodoEntrega] = useState("retiro");
   const [metodoPago, setMetodoPago] = useState("efectivo");
   const [direccion, setDireccion] = useState("");
+  const [direccionSeleccionada, setDireccionSeleccionada] = useState(null);
+  const [costoEnvio, setCostoEnvio] = useState(0);
+  const [cargandoEnvio, setCargandoEnvio] = useState(false);
+  const [notas, setNotas] = useState("");
+  const [nombreCliente, setNombreCliente] = useState("");
+  const autocompleteRef = useRef(null);
+  const inputRef = useRef(null);
   
   const { items, isOpen, totalItems, totalPrice, dispatch } = useCart();
 
+  // Cargar Google Maps API
+  useEffect(() => {
+    if (typeof window !== 'undefined' && !window.google) {
+      const script = document.createElement('script');
+      script.src = `https://maps.googleapis.com/maps/api/js?key=AIzaSyCkVq9kSWcQdaLcdGc_JF7s8fQoqk9ngWA&libraries=places`;
+      script.async = true;
+      script.defer = true;
+      document.head.appendChild(script);
+    }
+  }, []);
+
+  // Inicializar Autocomplete cuando el componente se monta
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 
+        window.google && 
+        window.google.maps && 
+        inputRef.current && 
+        metodoEntrega === "envio") {
+      const autocomplete = new window.google.maps.places.Autocomplete(inputRef.current, {
+        componentRestrictions: { country: 'AR' },
+        fields: ['formatted_address', 'geometry'],
+        types: ['address']
+      });
+
+      autocomplete.addListener('place_changed', () => {
+        const place = autocomplete.getPlace();
+        if (place.geometry) {
+          setDireccion(place.formatted_address);
+          setDireccionSeleccionada(place);
+          calcularCostoEnvio(place.geometry.location);
+        }
+      });
+
+      autocompleteRef.current = autocomplete;
+    }
+  }, [metodoEntrega, typeof window !== 'undefined' ? window.google : null]);
+
+  // Calcular costo de envío
+  const calcularCostoEnvio = async (destino) => {
+    if (typeof window === 'undefined') return;
+    
+    setCargandoEnvio(true);
+    try {
+      const service = new window.google.maps.DistanceMatrixService();
+      const origen = "Av. Alberdi 2000, Resistencia, Chaco, Argentina";
+      
+      service.getDistanceMatrix({
+        origins: [origen],
+        destinations: [destino],
+        travelMode: window.google.maps.TravelMode.DRIVING,
+        unitSystem: window.google.maps.UnitSystem.METRIC,
+        avoidHighways: false,
+        avoidTolls: false
+      }, (response, status) => {
+        if (status === 'OK') {
+          const distance = response.rows[0].elements[0].distance;
+          if (distance) {
+            const km = distance.value / 1000; // Convertir metros a km
+            const costoBase = km * 1000; // $1000 por km
+            const costo = Math.ceil(costoBase / 100) * 100; // Redondear al próximo múltiplo de 100
+            setCostoEnvio(costo);
+          }
+        } else {
+          console.error('Error calculando distancia:', status);
+          setCostoEnvio(1000); // Costo mínimo por defecto (ya es múltiplo de 100)
+        }
+        setCargandoEnvio(false);
+      });
+    } catch (error) {
+      console.error('Error:', error);
+      setCostoEnvio(1000); // Costo mínimo por defecto (ya es múltiplo de 100)
+      setCargandoEnvio(false);
+    }
+  };
+
+  // Reset envío cuando cambia método de entrega
+  useEffect(() => {
+    if (metodoEntrega === "retiro") {
+      setCostoEnvio(0);
+      setDireccion("");
+      setDireccionSeleccionada(null);
+    }
+  }, [metodoEntrega]);
+
 
   useEffect(() => {
-    if (isOpen) {
+    if (typeof window !== 'undefined' && isOpen) {
       document.body.style.overflow = 'hidden';
       document.body.style.position = 'fixed';
       document.body.style.width = '100%';
       document.body.style.top = `-${window.scrollY}px`;
-    } else {
-
+    } else if (typeof window !== 'undefined') {
       const scrollY = document.body.style.top;
       document.body.style.position = '';
       document.body.style.overflow = '';
@@ -29,10 +119,12 @@ export default function FloatingCart() {
     
 
     return () => {
-      document.body.style.overflow = '';
-      document.body.style.position = '';
-      document.body.style.top = '';
-      document.body.style.width = '';
+      if (typeof window !== 'undefined') {
+        document.body.style.overflow = '';
+        document.body.style.position = '';
+        document.body.style.top = '';
+        document.body.style.width = '';
+      }
     };
   }, [isOpen]);
 
@@ -57,20 +149,30 @@ export default function FloatingCart() {
   };
   
   const sendWhatsAppOrder = () => {
+    // Validar que el nombre esté completo
+    if (!nombreCliente.trim()) {
+      alert("Por favor ingresa tu nombre para el pedido");
+      return;
+    }
+
     // Número de WhatsApp (agregando el código de país)
     const phoneNumber = "5493624751290"; // Reemplaza este número con el número de WhatsApp real
     
     // Construir el mensaje
     let message = "🍕 *NUEVO PEDIDO - LA QUE VA* 🍕\n\n";
     
+    // Agregar nombre del cliente
+    message += `*Cliente:* ${nombreCliente}\n\n`;
+    
     // Agregar método de entrega y dirección si corresponde
     message += `*Método de entrega:* ${metodoEntrega === "retiro" ? "Retiro en Paseo Sur" : "Envío a domicilio"}\n`;
     if (metodoEntrega === "envio") {
       if (!direccion.trim()) {
-        alert("Por favor ingresa una dirección de entrega");
+        alert("Por favor selecciona una dirección de entrega");
         return;
       }
       message += `*Dirección:* ${direccion}\n`;
+      message += `*Costo de envío:* $${costoEnvio.toLocaleString()}\n`;
     }
     
     // Agregar método de pago
@@ -82,8 +184,17 @@ export default function FloatingCart() {
       message += `• ${item.quantity}x ${item.nombre} - $${(item.precio * item.quantity).toLocaleString()}\n`;
     });
     
-    // Agregar total
-    message += `\n*TOTAL:* $${totalPrice.toLocaleString()}`;
+    // Agregar subtotal y total
+    message += `\n*Subtotal:* $${totalPrice.toLocaleString()}`;
+    if (metodoEntrega === "envio" && costoEnvio > 0) {
+      message += `\n*Envío:* $${costoEnvio.toLocaleString()}`;
+    }
+    message += `\n*TOTAL:* $${(totalPrice + costoEnvio).toLocaleString()}`;
+    
+    // Agregar notas si existen
+    if (notas.trim()) {
+      message += `\n\n*Notas adicionales:* ${notas}`;
+    }
     
     // Agregar mensaje de cierre
     message += "\n\nPor favor confirmar mi pedido. ¡Gracias!";
@@ -95,7 +206,9 @@ export default function FloatingCart() {
     const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodedMessage}`;
     
     // Abrir WhatsApp
-    window.open(whatsappUrl, "_blank");
+    if (typeof window !== 'undefined') {
+      window.open(whatsappUrl, "_blank");
+    }
     
     // Opcionalmente: cerrar el carrito después de enviar el pedido
     // toggleCart();
@@ -181,7 +294,7 @@ export default function FloatingCart() {
                         />
                         <div className="flex-1">
                           <h3 className="font-medium text-sm">{item.nombre}</h3>
-                          <p className="text-red-600 font-semibold">${item.precio}</p>
+                          <p className="text-red-600 font-semibold">${item.precio.toLocaleString()}</p>
                         </div>
                         <div className="flex items-center space-x-2">
                           <button
@@ -208,8 +321,34 @@ export default function FloatingCart() {
               {items.length > 0 && (
                 <div className="border-t p-4 space-y-4 bg-white">
                   <div className="flex justify-between items-center text-lg font-semibold">
+                    <span>Subtotal:</span>
+                    <span className="text-red-600">${totalPrice.toLocaleString()}</span>
+                  </div>
+
+                  {/* Mostrar costo de envío si aplica */}
+                  {metodoEntrega === "envio" && costoEnvio > 0 && (
+                    <div className="flex justify-between items-center text-sm">
+                      <span>Envío:</span>
+                      <span className="text-gray-600">${costoEnvio.toLocaleString()}</span>
+                    </div>
+                  )}
+
+                  {/* Total final */}
+                  <div className="flex justify-between items-center text-lg font-bold border-t pt-2">
                     <span>Total:</span>
-                    <span className="text-red-600">${totalPrice.toFixed(0)}</span>
+                    <span className="text-red-600">${(totalPrice + costoEnvio).toLocaleString()}</span>
+                  </div>
+
+                  {/* Nombre del cliente */}
+                  <div className="text-sm font-semibold">
+                    <label className="block mb-1">Nombre del pedido:</label>
+                    <input
+                      type="text"
+                      value={nombreCliente}
+                      onChange={(e) => setNombreCliente(e.target.value)}
+                      placeholder="Ej: Juan Pérez"
+                      className="w-full border rounded-lg px-3 py-2 text-gray-700 focus:outline-none focus:ring-2 focus:ring-red-500"
+                    />
                   </div>
 
                   {/* Método de pago */}
@@ -240,17 +379,41 @@ export default function FloatingCart() {
 
                   {/* Dirección si elige envío */}
                   {metodoEntrega === "envio" && (
-                    <div className="text-sm font-semibold">
-                      <label className="block mb-1">Dirección de entrega:</label>
+                    <div className="text-sm font-semibold space-y-2">
+                      <label className="flex items-center mb-1">
+                        <FaMapMarkerAlt className="mr-1 text-red-600" />
+                        Dirección de entrega:
+                      </label>
                       <input
+                        ref={inputRef}
                         type="text"
                         value={direccion}
                         onChange={(e) => setDireccion(e.target.value)}
-                        placeholder="Ej: Av. Italia 1234"
-                        className="w-full border rounded-lg px-2 py-1 text-gray-700"
+                        placeholder="Buscar dirección..."
+                        className="w-full border rounded-lg px-3 py-2 text-gray-700 focus:outline-none focus:ring-2 focus:ring-red-500"
                       />
+                      {cargandoEnvio && (
+                        <p className="text-xs text-blue-600">Calculando costo de envío...</p>
+                      )}
+                      {costoEnvio > 0 && !cargandoEnvio && (
+                        <p className="text-xs text-green-600">
+                          Costo de envío: ${costoEnvio.toLocaleString()}
+                        </p>
+                      )}
                     </div>
                   )}
+
+                  {/* Notas adicionales */}
+                  <div className="text-sm font-semibold">
+                    <label className="block mb-1">Notas adicionales (opcional):</label>
+                    <textarea
+                      value={notas}
+                      onChange={(e) => setNotas(e.target.value)}
+                      placeholder="Ej: Sin cebolla, extra queso, timbre roto..."
+                      rows="2"
+                      className="w-full border rounded-lg px-3 py-2 text-gray-700 resize-none focus:outline-none focus:ring-2 focus:ring-red-500"
+                    />
+                  </div>
 
                   {/* Botones */}
                   <div className="space-y-2">

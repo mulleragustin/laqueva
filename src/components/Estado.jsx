@@ -90,7 +90,7 @@ export default function EstadoDePedidos() {
           transition={{ duration: 0.6 }}
         >
           <motion.a
-            href="https://instagram.com/laquevapizzeria"
+            href="https://www.instagram.com/laqueva.pizzas/"
             target="_blank"
             rel="noopener noreferrer"
             whileHover={{ scale: 1.2, rotate: 5 }}
@@ -100,16 +100,7 @@ export default function EstadoDePedidos() {
             <FaInstagram size={40} />
           </motion.a>
 
-          <motion.a
-            href="https://facebook.com/laquevapizzeria"
-            target="_blank"
-            rel="noopener noreferrer"
-            whileHover={{ scale: 1.2, rotate: -5 }}
-            whileTap={{ scale: 0.95 }}
-            className="text-red-500 transition-transform"
-          >
-            <FaFacebook size={40} />
-          </motion.a>
+          
 
           <motion.a
             href="https://wa.me/5493624751290?text=Hola,%20quiero%20estar%20en%20el%20grupo%20de%20whatsapp"

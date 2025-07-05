@@ -12,7 +12,7 @@ export default function PizzaImage({ src, alt, className }) {
   }, [src]);
 
   return (
-    <div className={`relative ${className} transition-opacity duration-300`}>
+    <div className={`relative transition-opacity duration-300 ${className}`}>
       {!isLoaded && !error && (
         <div className="absolute inset-0 bg-gray-300 animate-pulse rounded-lg"></div>
       )}
@@ -24,7 +24,7 @@ export default function PizzaImage({ src, alt, className }) {
         <img 
           src={src} 
           alt={alt} 
-          className={`w-full h-full object-scale-down rounded-lg ${isLoaded ? 'opacity-100' : 'opacity-0'}`}
+          className={`w-full h-full object-cover ${isLoaded ? 'opacity-100' : 'opacity-0'} ${className}`}
           onError={() => setError(true)}
         />
       )}

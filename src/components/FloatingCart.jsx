@@ -1,7 +1,9 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { useCart } from "../context/CartContext";
-import { FaShoppingCart, FaTimes, FaPlus, FaMinus, FaWhatsapp, FaMapMarkerAlt } from "react-icons/fa";
+import { FaShoppingCart, FaTimes, FaPlus, FaMinus, FaWhatsapp, FaMapMarkerAlt, FaSpinner } from "react-icons/fa";
 import { useState, useEffect, useRef } from "react";
+import { guardarPedido } from "../firebase/pedidos";
+import { probarFirebase, probarLecturaPedidos } from "../utils/testFirebase";
 
 export default function FloatingCart() {
   const [metodoEntrega, setMetodoEntrega] = useState("retiro");
@@ -12,10 +14,31 @@ export default function FloatingCart() {
   const [cargandoEnvio, setCargandoEnvio] = useState(false);
   const [notas, setNotas] = useState("");
   const [nombreCliente, setNombreCliente] = useState("");
+  const [guardandoPedido, setGuardandoPedido] = useState(false);
+  const [notificacion, setNotificacion] = useState(null);
   const autocompleteRef = useRef(null);
   const inputRef = useRef(null);
   
   const { items, isOpen, totalItems, totalPrice, dispatch } = useCart();
+
+  // Función para mostrar notificaciones
+  const mostrarNotificacion = (mensaje, tipo = 'info', duracion = 3000) => {
+    setNotificacion({ mensaje, tipo });
+    setTimeout(() => setNotificacion(null), duracion);
+  };
+
+  // Hacer funciones disponibles globalmente para debugging (solo en desarrollo)
+  useEffect(() => {
+    if (typeof window !== 'undefined' && import.meta.env.DEV) {
+      window.probarFirebase = probarFirebase;
+      window.probarLecturaPedidos = probarLecturaPedidos;
+      window.guardarPedidoTest = guardarPedido;
+      console.log("🔧 Funciones de debug disponibles:");
+      console.log("   - window.probarFirebase()");
+      console.log("   - window.probarLecturaPedidos()");
+      console.log("   - window.guardarPedidoTest(datos)");
+    }
+  }, []);
 
   // Cargar Google Maps API
   useEffect(() => {
@@ -61,7 +84,7 @@ export default function FloatingCart() {
     setCargandoEnvio(true);
     try {
       const service = new window.google.maps.DistanceMatrixService();
-      const origen = "Av. Alberdi 2000, Resistencia, Chaco, Argentina";
+      const origen = "Pasaje Necochea 2035, Resistencia, Chaco, Argentina";
       
       service.getDistanceMatrix({
         origins: [origen],
@@ -148,70 +171,136 @@ export default function FloatingCart() {
     dispatch({ type: 'CLEAR_CART' });
   };
   
-  const sendWhatsAppOrder = () => {
+  const sendWhatsAppOrder = async () => {
+    console.log("🍕 Iniciando proceso de pedido...");
+    
     // Validar que el nombre esté completo
     if (!nombreCliente.trim()) {
-      alert("Por favor ingresa tu nombre para el pedido");
+      mostrarNotificacion("Por favor ingresa tu nombre para el pedido", "error");
       return;
     }
 
-    // Número de WhatsApp (agregando el código de país)
-    const phoneNumber = "5493624751290"; // Reemplaza este número con el número de WhatsApp real
-    
-    // Construir el mensaje
-    let message = "🍕 *NUEVO PEDIDO - LA QUE VA* 🍕\n\n";
-    
-    // Agregar nombre del cliente
-    message += `*Cliente:* ${nombreCliente}\n\n`;
-    
-    // Agregar método de entrega y dirección si corresponde
-    message += `*Método de entrega:* ${metodoEntrega === "retiro" ? "Retiro en Paseo Sur" : "Envío a domicilio"}\n`;
-    if (metodoEntrega === "envio") {
-      if (!direccion.trim()) {
-        alert("Por favor selecciona una dirección de entrega");
-        return;
-      }
-      message += `*Dirección:* ${direccion}\n`;
-      message += `*Costo de envío:* $${costoEnvio.toLocaleString()}\n`;
+    // Validar dirección si es envío
+    if (metodoEntrega === "envio" && !direccion.trim()) {
+      mostrarNotificacion("Por favor selecciona una dirección de entrega", "error");
+      return;
     }
+
+    setGuardandoPedido(true);
+    mostrarNotificacion("Guardando pedido...", "info");
     
-    // Agregar método de pago
-    message += `*Método de pago:* ${metodoPago === "efectivo" ? "Efectivo" : "Transferencia"}\n\n`;
-    
-    // Agregar los productos
-    message += "*Productos:*\n";
-    items.forEach(item => {
-      message += `• ${item.quantity}x ${item.nombre} - $${(item.precio * item.quantity).toLocaleString()}\n`;
+    console.log("📦 Datos del pedido:", {
+      items,
+      totalPrice,
+      costoEnvio,
+      metodoEntrega,
+      direccion,
+      metodoPago,
+      nombreCliente,
+      notas
     });
-    
-    // Agregar subtotal y total
-    message += `\n*Subtotal:* $${totalPrice.toLocaleString()}`;
-    if (metodoEntrega === "envio" && costoEnvio > 0) {
-      message += `\n*Envío:* $${costoEnvio.toLocaleString()}`;
+
+    try {
+      console.log("💾 Intentando guardar en Firebase...");
+      
+      // Guardar pedido en Firebase
+      const resultado = await guardarPedido({
+        items,
+        totalPrice,
+        costoEnvio,
+        metodoEntrega,
+        direccion,
+        metodoPago,
+        nombreCliente,
+        notas
+      });
+
+      console.log("📤 Resultado de Firebase:", resultado);
+
+      if (resultado.success) {
+        console.log("✅ Pedido guardado exitosamente, preparando WhatsApp...");
+        
+        // Mostrar notificación de éxito
+        mostrarNotificacion(`🎉 Pedido #${resultado.numeroOrden} guardado! Abriendo WhatsApp...`, "success", 5000);
+        
+        // Número de WhatsApp (agregando el código de país)
+        const phoneNumber = "5493624751290";
+        
+        // Construir el mensaje
+        let message = "🍕 *NUEVO PEDIDO - LA QUE VA* 🍕\n\n";
+        
+        // Agregar número de orden prominente
+        message += `🔢 *PEDIDO #${resultado.numeroOrden}*\n`;
+        message += `📅 *Fecha:* ${new Date().toLocaleString('es-AR', {
+          day: '2-digit',
+          month: '2-digit', 
+          hour: '2-digit',
+          minute: '2-digit'
+        })}\n\n`;
+        
+        // Agregar nombre del cliente
+        message += `👤 *Cliente:* ${nombreCliente}\n\n`;
+        
+        // Agregar método de entrega y dirección si corresponde
+        message += `*Método de entrega:* ${metodoEntrega === "retiro" ? "Retiro en Pasaje Necochea 2035" : "Envío a domicilio"}\n`;
+        if (metodoEntrega === "envio") {
+          message += `*Dirección:* ${direccion}\n`;
+          message += `*Costo de envío:* $${costoEnvio.toLocaleString()}\n`;
+        }
+        
+        // Agregar método de pago
+        message += `*Método de pago:* ${metodoPago === "efectivo" ? "Efectivo" : "Transferencia"}\n\n`;
+        
+        // Agregar los productos
+        message += "*Productos:*\n";
+        items.forEach(item => {
+          message += `• ${item.quantity}x ${item.nombre} - $${(item.precio * item.quantity).toLocaleString()}\n`;
+        });
+        
+        // Agregar subtotal y total
+        message += `\n*Subtotal:* $${totalPrice.toLocaleString()}`;
+        if (metodoEntrega === "envio" && costoEnvio > 0) {
+          message += `\n*Envío:* $${costoEnvio.toLocaleString()}`;
+        }
+        message += `\n*TOTAL:* $${(totalPrice + costoEnvio).toLocaleString()}`;
+        
+        // Agregar notas si existen
+        if (notas.trim()) {
+          message += `\n\n*Notas adicionales:* ${notas}`;
+        }
+        
+        // Agregar mensaje de cierre
+        message += "\n\n✅ *Pedido registrado en el sistema*";
+        message += "\nPor favor confirmar mi pedido. ¡Gracias!";
+        
+        console.log("📱 Mensaje de WhatsApp preparado:", message);
+        
+        // Codificar el mensaje para la URL
+        const encodedMessage = encodeURIComponent(message);
+        
+        // Crear la URL de WhatsApp
+        const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodedMessage}`;
+        
+        console.log("🔗 URL de WhatsApp:", whatsappUrl);
+        
+        // Abrir WhatsApp
+        if (typeof window !== 'undefined') {
+          window.open(whatsappUrl, "_blank");
+        }
+        
+        // Limpiar carrito después de enviar el pedido exitosamente
+        clearCart();
+        
+      } else {
+        console.error("❌ Error al guardar pedido:", resultado.error);
+        mostrarNotificacion(`Error al guardar el pedido: ${resultado.error || 'Error desconocido'}`, "error");
+      }
+    } catch (error) {
+      console.error("💥 Error en el proceso:", error);
+      mostrarNotificacion(`Error al procesar el pedido: ${error.message}`, "error");
+    } finally {
+      setGuardandoPedido(false);
     }
-    message += `\n*TOTAL:* $${(totalPrice + costoEnvio).toLocaleString()}`;
-    
-    // Agregar notas si existen
-    if (notas.trim()) {
-      message += `\n\n*Notas adicionales:* ${notas}`;
-    }
-    
-    // Agregar mensaje de cierre
-    message += "\n\nPor favor confirmar mi pedido. ¡Gracias!";
-    
-    // Codificar el mensaje para la URL
-    const encodedMessage = encodeURIComponent(message);
-    
-    // Crear la URL de WhatsApp
-    const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodedMessage}`;
-    
-    // Abrir WhatsApp
-    if (typeof window !== 'undefined') {
-      window.open(whatsappUrl, "_blank");
-    }
-    
-    // Opcionalmente: cerrar el carrito después de enviar el pedido
-    // toggleCart();
   };
 
   return (
@@ -219,13 +308,14 @@ export default function FloatingCart() {
       {/* Botón flotante del carrito */}
       <motion.button
         onClick={toggleCart}
-        className="fixed top-6 right-6 bg-red-600 text-white p-4 rounded-full shadow-lg z-50 hover:bg-red-700 transition-colors"
-        whileHover={{ scale: 1.1 }}
-        whileTap={{ scale: 0.9 }}
-        animate={totalItems > 0 ? { scale: [1, 1.2, 1] } : { scale: 1 }}
+        className="fixed top-6 right-6 bg-white hover:bg-red-600 text-red-600 hover:text-white px-4 py-3 rounded-full shadow-lg z-50 transition-colors flex items-center space-x-2"
+        whileHover={{ scale: 1.05 }}
+        whileTap={{ scale: 0.95 }}
+        animate={totalItems > 0 ? { scale: [1, 1.1, 1] } : { scale: 1 }}
         transition={{ duration: 0.3 }}
       >
         <FaShoppingCart className="text-xl" />
+        <span className="font-medium text-sm whitespace-nowrap">Ver carrito</span>
         {totalItems > 0 && (
           <motion.span
             initial={{ scale: 0 }}
@@ -372,7 +462,7 @@ export default function FloatingCart() {
                       onChange={(e) => setMetodoEntrega(e.target.value)}
                       className="w-full border rounded-lg px-2 py-1 text-gray-700"
                     >
-                      <option value="retiro">Retiro en Paseo Sur</option>
+                      <option value="retiro">Retiro en Pje. Necochea 2035</option>
                       <option value="envio">Envío a domicilio</option>
                     </select>
                   </div>
@@ -419,14 +509,25 @@ export default function FloatingCart() {
                   <div className="space-y-2">
                     <button 
                       onClick={sendWhatsAppOrder}
-                      className="w-full bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 transition-colors font-semibold flex items-center justify-center"
+                      disabled={guardandoPedido}
+                      className="w-full bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 transition-colors font-semibold flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      <FaWhatsapp className="mr-2 text-xl" />
-                      <span>Enviar pedido por WhatsApp</span>
+                      {guardandoPedido ? (
+                        <>
+                          <FaSpinner className="mr-2 text-xl animate-spin" />
+                          <span>Guardando pedido...</span>
+                        </>
+                      ) : (
+                        <>
+                          <FaWhatsapp className="mr-2 text-xl" />
+                          <span>Enviar pedido por WhatsApp</span>
+                        </>
+                      )}
                     </button>
                     <button
                       onClick={clearCart}
-                      className="w-full bg-gray-200 text-gray-700 py-2 rounded-lg hover:bg-gray-300 transition-colors text-sm"
+                      disabled={guardandoPedido}
+                      className="w-full bg-gray-200 text-gray-700 py-2 rounded-lg hover:bg-gray-300 transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       Vaciar Carrito
                     </button>
@@ -435,6 +536,24 @@ export default function FloatingCart() {
               )}
             </motion.div>
           </>
+        )}
+      </AnimatePresence>
+
+      {/* Notificaciones Toast */}
+      <AnimatePresence>
+        {notificacion && (
+          <motion.div
+            initial={{ opacity: 0, y: -50, x: "-50%" }}
+            animate={{ opacity: 1, y: 0, x: "-50%" }}
+            exit={{ opacity: 0, y: -50, x: "-50%" }}
+            className={`fixed top-6 left-1/2 transform z-[60] px-6 py-3 rounded-lg shadow-lg text-white font-medium max-w-sm text-center ${
+              notificacion.tipo === 'success' ? 'bg-green-600' :
+              notificacion.tipo === 'error' ? 'bg-red-600' :
+              'bg-blue-600'
+            }`}
+          >
+            {notificacion.mensaje}
+          </motion.div>
         )}
       </AnimatePresence>
     </>

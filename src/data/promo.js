@@ -1,0 +1,32 @@
+[{
+    id: 8,
+    nombre: "2 MUZZA",
+    ingredientes: ["2 Pizzas Muzzarella"],
+    precio: 10000,
+    imagen: "pizza.png",
+    esPromo: true,
+  },
+  {
+    id: 9,
+    nombre: "1 MUZZA + 1 ESPECIAL",
+    ingredientes: ["1 Pizza Muzzarella", "1 Pizza Especial"],
+    precio: 12000,
+    imagen: "pizza.png",
+    esPromo: true,
+  },
+  {
+    id: 10,
+    nombre: "1 NAPO + 1 FUGA",
+    ingredientes: ["1 Pizza Napolitana", "1 Pizza Fugazzeta"],
+    precio: 12000,
+    imagen: "pizza.png",
+    esPromo: true,
+  },
+  {
+    id: 11,
+    nombre: "1 NAPO + 1 FUGA (CON JAMÓN)",
+    ingredientes: ["1 Pizza Napolitana con Jamón", "1 Pizza Fugazzeta con Jamón"],
+    precio: 13000,
+    imagen: "pizza.png",
+    esPromo: true,
+  },]

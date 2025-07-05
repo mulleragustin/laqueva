@@ -1,4 +1,9 @@
 
+---
+const { title } = Astro.props;
+const isAdminPage = Astro.url.pathname.includes('admin');
+---
+
 <!doctype html>
 <html lang="es">
     <head>
@@ -39,7 +44,7 @@
         
         <title>La Que Va - Pizzería Online</title>
     </head>
-    <body class="flex justify-center min-h-screen bg-yellow-50">
+    <body class={isAdminPage ? "min-h-screen w-full" : "flex justify-center min-h-screen bg-yellow-50"}>
         <slot />
     </body>
 </html>

@@ -52,12 +52,12 @@ export default function Card({ pizza, index }) {
       }`}
     >
       <div className="flex w-full flex-1 p-2">
-        <div className="w-1/4 p-1 items-center justify-center flex bg-slate-900/90 rounded-lg">
+        <div className="w-1/4  items-center justify-center flex rounded-lg">
           <PizzaImage
             client:load
             src={pizza.imagen}
             alt={`Pizza ${pizza.nombre}`}
-            className="w-16 h-16 sm:w-28 sm:h-28"
+            className="w-16 h-16 sm:w-28 sm:h-28 rounded-lg object-cover"
           />
         </div>
         <div className="w-3/4 pl-3 flex flex-col justify-between">

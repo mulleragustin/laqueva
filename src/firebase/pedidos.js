@@ -67,6 +67,7 @@ export const guardarPedido = async (datosCarrito) => {
       direccion,
       metodoPago,
       nombreCliente,
+      telefonoCliente,
       notas
     } = datosCarrito;
 
@@ -77,15 +78,30 @@ export const guardarPedido = async (datosCarrito) => {
     const numeroOrden = await obtenerProximoNumeroOrden();
     console.log("📊 Número de orden:", numeroOrden);
     
-    // Preparar items para Firebase de forma simple
+    // Preparar items para Firebase incluyendo gustos para doble gusto
     console.log("🛠️ Preparando items para Firebase...");
-    const itemsParaFirebase = items.map(item => ({
-      id: item.id,
-      nombre: item.nombre,
-      precio: item.precio,
-      cantidad: item.quantity,
-      esPromo: item.esPromo || false
-    }));
+    const itemsParaFirebase = items.map(item => {
+      const itemBase = {
+        id: item.id,
+        nombre: item.nombre,
+        precio: item.precio,
+        cantidad: item.quantity,
+        esPromo: item.esPromo || false
+      };
+
+      // Si es doble gusto, agregar información de los gustos
+      if (item.esDobleGusto && item.gustos && item.gustos.length === 2) {
+        itemBase.esDobleGusto = true;
+        itemBase.gustos = item.gustos.map(gusto => ({
+          id: gusto.id,
+          nombre: gusto.nombre,
+          precio: gusto.precio,
+          ingredientes: gusto.ingredientes || []
+        }));
+      }
+
+      return itemBase;
+    });
     console.log("📦 Items preparados:", itemsParaFirebase);
     
     // Calcular total de pizzas simple
@@ -96,7 +112,8 @@ export const guardarPedido = async (datosCarrito) => {
     const pedido = {
       numeroOrden,
       cliente: {
-        nombre: nombreCliente
+        nombre: nombreCliente,
+        telefono: telefonoCliente
       },
       items: itemsParaFirebase,
       resumen: {
@@ -287,10 +304,10 @@ export const imprimirComanda = (pedido) => {
   });
 
   const contenidoComanda = `
-    <div style="font-family: 'Courier New', monospace; max-width: 300px; margin: 0 auto; padding: 20px;">
+    <div style="font-family: 'Courier New', monospace; max-width: 300px; margin: 0 auto; padding: 5px;">
       <div style="text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 15px;">
         <h1 style="margin: 0; font-size: 24px;">LA QUE VA</h1>
-        <p style="margin: 5px 0;">🍕 PIZZERÍA 🍕</p>
+        <p style="margin: 5px 0;"> PIZZERÍA </p>
       </div>
       
       <div style="margin-bottom: 15px;">
@@ -303,6 +320,7 @@ export const imprimirComanda = (pedido) => {
       <div style="margin-bottom: 15px;">
         <strong>CLIENTE:</strong><br>
         ${pedido.cliente.nombre}<br>
+        ${pedido.cliente.telefono ? `${pedido.cliente.telefono}<br>` : ''}
         <hr style="border: 1px dashed #000;">
       </div>
       
@@ -316,12 +334,29 @@ export const imprimirComanda = (pedido) => {
       
       <div style="margin-bottom: 15px;">
         <strong>PRODUCTOS:</strong><br>
-        ${pedido.items.map(item => 
-          `${item.cantidad}x ${item.nombre}<br>
-           ${item.esPromo ? '<em>(PROMO)</em>' : ''}<br>`
-        ).join('')}
+        ${pedido.items.map(item => {
+          let linea = `${item.cantidad}x ${item.nombre}<br>`;
+          
+          // Si es doble gusto, mostrar los gustos
+          if (item.esDobleGusto && item.gustos && item.gustos.length === 2) {
+            linea += `<small>   (${item.gustos[0].nombre} & ${item.gustos[1].nombre})</small><br>`;
+          }
+          
+          if (item.esPromo) {
+            linea += '<em>(PROMO)</em><br>';
+          }
+          
+          return linea;
+        }).join('')}
         <hr style="border: 1px dashed #000;">
       </div>
+      ${pedido.notas ? `
+        <div style="margin-bottom: 15px;">
+          <strong>NOTAS:</strong><br>
+          <em>${pedido.notas}</em><br>
+          <hr style="border: 1px dashed #000;">
+        </div>
+      ` : ''}
       
       <div style="margin-bottom: 15px;">
         <strong>TOTAL PIZZAS:</strong> ${pedido.resumen.totalPizzas}<br>
@@ -333,13 +368,7 @@ export const imprimirComanda = (pedido) => {
         <hr style="border: 2px solid #000;">
       </div>
       
-      ${pedido.notas ? `
-        <div style="margin-bottom: 15px;">
-          <strong>NOTAS:</strong><br>
-          <em>${pedido.notas}</em><br>
-          <hr style="border: 1px dashed #000;">
-        </div>
-      ` : ''}
+      
       
       <div style="text-align: center; margin-top: 20px;">
         <p style="margin: 0;">¡Gracias por elegirnos!</p>
@@ -402,4 +431,36 @@ export const obtenerVentasHoy = async () => {
     console.error("Error obteniendo ventas:", error);
     return null;
   }
+};
+
+// Función para enviar confirmación de pedido por WhatsApp
+export const enviarConfirmacionWhatsApp = (pedido) => {
+  // Construir el mensaje de confirmación
+  let mensaje = `Hola ${pedido.cliente.nombre}, confirmamos tu pedido N° ${pedido.numeroOrden} ✅\n\n`;
+  
+  // Agregar información de entrega
+  if (pedido.entrega.tipo === "envio") {
+    mensaje += `Lo enviaremos a ${pedido.entrega.direccion} 🛵\n`;
+    mensaje += `Tiempo de entrega estimado: 40 minutos ⏰\n`;
+  } else {
+    mensaje += `Puedes retirar tu pedido en Pasaje Necochea 2035 🏪\n`;
+    mensaje += `Tiempo de preparación estimado: 25 minutos ⏰\n`;
+  }
+  
+  mensaje += `El costo de tu orden es de $${pedido.resumen.total.toLocaleString()}\n\n`;
+  mensaje += `¡Gracias por tu compra! La Que Va Pizzería 🍕`;
+  
+  // Codificar el mensaje para la URL
+  const encodedMessage = encodeURIComponent(mensaje);
+  
+  // Crear la URL de WhatsApp con el teléfono del cliente
+  const phoneNumber = pedido.cliente.telefono.replace(/\D/g, ''); // Remover caracteres no numéricos
+  const whatsappUrl = `https://wa.me/54${phoneNumber}?text=${encodedMessage}`;
+  
+  // Abrir WhatsApp
+  if (typeof window !== 'undefined') {
+    window.open(whatsappUrl, "_blank");
+  }
+  
+  return whatsappUrl;
 };

@@ -64,7 +64,7 @@ export default function Card({ pizza, index }) {
           <div>
             <div
               className={`font-rubik-wet text-xl ${
-                pizza.nombre ? "text-yellow-300" : "text-white"
+                pizza.nombre ? "text-yellow-300 break-all" : "text-white"
               }`}
             >
               {pizza.nombre.toUpperCase()}

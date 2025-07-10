@@ -12,10 +12,15 @@ export default function FloatingCart() {
   const [direccionSeleccionada, setDireccionSeleccionada] = useState(null);
   const [costoEnvio, setCostoEnvio] = useState(0);
   const [cargandoEnvio, setCargandoEnvio] = useState(false);
+  const [distanciaKm, setDistanciaKm] = useState(0);
+  const [errorDistancia, setErrorDistancia] = useState("");
   const [notas, setNotas] = useState("");
   const [nombreCliente, setNombreCliente] = useState("");
+  const [telefonoCliente, setTelefonoCliente] = useState("");
   const [guardandoPedido, setGuardandoPedido] = useState(false);
   const [notificacion, setNotificacion] = useState(null);
+  const [pedidoConfirmado, setPedidoConfirmado] = useState(null);
+  const [pestanaActiva, setPestanaActiva] = useState("pedido");
   const autocompleteRef = useRef(null);
   const inputRef = useRef(null);
   
@@ -82,6 +87,8 @@ export default function FloatingCart() {
     if (typeof window === 'undefined') return;
     
     setCargandoEnvio(true);
+    setErrorDistancia(""); // Limpiar errores previos
+    
     try {
       const service = new window.google.maps.DistanceMatrixService();
       const origen = "Pasaje Necochea 2035, Resistencia, Chaco, Argentina";
@@ -98,19 +105,37 @@ export default function FloatingCart() {
           const distance = response.rows[0].elements[0].distance;
           if (distance) {
             const km = distance.value / 1000; // Convertir metros a km
-            const costoBase = km * 1000; // $1000 por km
-            const costo = Math.ceil(costoBase / 100) * 100; // Redondear al próximo múltiplo de 100
-            setCostoEnvio(costo);
+            const metros = distance.value;
+            
+            // Validar distancia mínima (100m) y máxima (15km)
+            if (metros < 100) {
+              setErrorDistancia("La dirección está muy cerca. Mínimo 100 metros para envío.");
+              setCostoEnvio(0);
+              setDistanciaKm(km);
+            } else if (km > 15) {
+              setErrorDistancia("La dirección está muy lejos. Máximo 15 km para envío.");
+              setCostoEnvio(0);
+              setDistanciaKm(km);
+            } else {
+              // Distancia válida
+              const costoBase = km * 1000; // $1000 por km
+              const costo = Math.ceil(costoBase / 100) * 100; // Redondear al próximo múltiplo de 100
+              setCostoEnvio(costo);
+              setDistanciaKm(km);
+              setErrorDistancia("");
+            }
           }
         } else {
           console.error('Error calculando distancia:', status);
-          setCostoEnvio(1000); // Costo mínimo por defecto (ya es múltiplo de 100)
+          setErrorDistancia("Error al calcular la distancia. Por favor intenta con otra dirección.");
+          setCostoEnvio(0);
         }
         setCargandoEnvio(false);
       });
     } catch (error) {
       console.error('Error:', error);
-      setCostoEnvio(1000); // Costo mínimo por defecto (ya es múltiplo de 100)
+      setErrorDistancia("Error al calcular la distancia. Por favor intenta con otra dirección.");
+      setCostoEnvio(0);
       setCargandoEnvio(false);
     }
   };
@@ -121,6 +146,8 @@ export default function FloatingCart() {
       setCostoEnvio(0);
       setDireccion("");
       setDireccionSeleccionada(null);
+      setDistanciaKm(0);
+      setErrorDistancia("");
     }
   }, [metodoEntrega]);
 
@@ -170,6 +197,11 @@ export default function FloatingCart() {
   const clearCart = () => {
     dispatch({ type: 'CLEAR_CART' });
   };
+
+  const cerrarConfirmacion = () => {
+    setPedidoConfirmado(null);
+    dispatch({ type: 'CLOSE_CART' });
+  };
   
   const sendWhatsAppOrder = async () => {
     console.log("🍕 Iniciando proceso de pedido...");
@@ -180,14 +212,38 @@ export default function FloatingCart() {
       return;
     }
 
+    // Validar que el teléfono esté completo
+    if (!telefonoCliente.trim()) {
+      mostrarNotificacion("Por favor ingresa tu número de teléfono", "error");
+      return;
+    }
+
     // Validar dirección si es envío
     if (metodoEntrega === "envio" && !direccion.trim()) {
       mostrarNotificacion("Por favor selecciona una dirección de entrega", "error");
       return;
     }
 
+    // Validar distancia y costo de envío si es envío
+    if (metodoEntrega === "envio") {
+      if (errorDistancia) {
+        mostrarNotificacion(errorDistancia, "error");
+        return;
+      }
+      
+      if (costoEnvio === 0) {
+        mostrarNotificacion("Por favor espera a que se calcule el costo de envío", "error");
+        return;
+      }
+      
+      if (cargandoEnvio) {
+        mostrarNotificacion("Calculando costo de envío, por favor espera...", "error");
+        return;
+      }
+    }
+
     setGuardandoPedido(true);
-    mostrarNotificacion("Guardando pedido...", "info");
+    mostrarNotificacion("Procesando pedido...", "info");
     
     console.log("📦 Datos del pedido:", {
       items,
@@ -197,6 +253,7 @@ export default function FloatingCart() {
       direccion,
       metodoPago,
       nombreCliente,
+      telefonoCliente,
       notas
     });
 
@@ -212,83 +269,24 @@ export default function FloatingCart() {
         direccion,
         metodoPago,
         nombreCliente,
+        telefonoCliente,
         notas
       });
 
       console.log("📤 Resultado de Firebase:", resultado);
 
       if (resultado.success) {
-        console.log("✅ Pedido guardado exitosamente, preparando WhatsApp...");
+        console.log("✅ Pedido guardado exitosamente");
         
-        // Mostrar notificación de éxito
-        mostrarNotificacion(`🎉 Pedido #${resultado.numeroOrden} guardado! Abriendo WhatsApp...`, "success", 5000);
-        
-        // Número de WhatsApp (agregando el código de país)
-        const phoneNumber = "5493624751290";
-        
-        // Construir el mensaje
-        let message = "🍕 *NUEVO PEDIDO - LA QUE VA* 🍕\n\n";
-        
-        // Agregar número de orden prominente
-        message += `🔢 *PEDIDO #${resultado.numeroOrden}*\n`;
-        message += `📅 *Fecha:* ${new Date().toLocaleString('es-AR', {
-          day: '2-digit',
-          month: '2-digit', 
-          hour: '2-digit',
-          minute: '2-digit'
-        })}\n\n`;
-        
-        // Agregar nombre del cliente
-        message += `👤 *Cliente:* ${nombreCliente}\n\n`;
-        
-        // Agregar método de entrega y dirección si corresponde
-        message += `*Método de entrega:* ${metodoEntrega === "retiro" ? "Retiro en Pasaje Necochea 2035" : "Envío a domicilio"}\n`;
-        if (metodoEntrega === "envio") {
-          message += `*Dirección:* ${direccion}\n`;
-          message += `*Costo de envío:* $${costoEnvio.toLocaleString()}\n`;
-        }
-        
-        // Agregar método de pago
-        message += `*Método de pago:* ${metodoPago === "efectivo" ? "Efectivo" : "Transferencia"}\n\n`;
-        
-        // Agregar los productos
-        message += "*Productos:*\n";
-        items.forEach(item => {
-          message += `• ${item.quantity}x ${item.nombre} - $${(item.precio * item.quantity).toLocaleString()}\n`;
+        // Guardar información del pedido confirmado
+        setPedidoConfirmado({
+          numeroOrden: resultado.numeroOrden,
+          telefono: telefonoCliente,
+          nombre: nombreCliente,
+          total: totalPrice + costoEnvio
         });
         
-        // Agregar subtotal y total
-        message += `\n*Subtotal:* $${totalPrice.toLocaleString()}`;
-        if (metodoEntrega === "envio" && costoEnvio > 0) {
-          message += `\n*Envío:* $${costoEnvio.toLocaleString()}`;
-        }
-        message += `\n*TOTAL:* $${(totalPrice + costoEnvio).toLocaleString()}`;
-        
-        // Agregar notas si existen
-        if (notas.trim()) {
-          message += `\n\n*Notas adicionales:* ${notas}`;
-        }
-        
-        // Agregar mensaje de cierre
-        message += "\n\n✅ *Pedido registrado en el sistema*";
-        message += "\nPor favor confirmar mi pedido. ¡Gracias!";
-        
-        console.log("📱 Mensaje de WhatsApp preparado:", message);
-        
-        // Codificar el mensaje para la URL
-        const encodedMessage = encodeURIComponent(message);
-        
-        // Crear la URL de WhatsApp
-        const whatsappUrl = `https://wa.me/${phoneNumber}?text=${encodedMessage}`;
-        
-        console.log("🔗 URL de WhatsApp:", whatsappUrl);
-        
-        // Abrir WhatsApp
-        if (typeof window !== 'undefined') {
-          window.open(whatsappUrl, "_blank");
-        }
-        
-        // Limpiar carrito después de enviar el pedido exitosamente
+        // Limpiar carrito después de guardar el pedido exitosamente
         clearCart();
         
       } else {
@@ -346,7 +344,7 @@ export default function FloatingCart() {
               animate={{ x: 0 }}
               exit={{ x: '100%' }}
               transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-              className="fixed right-0 top-0 h-full w-80 bg-white shadow-xl z-50 flex flex-col overflow-hidden"
+              className="fixed right-0 top-0 h-full w-full sm:w-96 max-w-md bg-white shadow-xl z-50 flex flex-col overflow-hidden"
             >
               {/* Header */}
               <div className="flex items-center justify-between p-4 border-b">
@@ -360,7 +358,7 @@ export default function FloatingCart() {
               </div>
 
               {/* Items del carrito - Esta sección debe tener su propio scroll */}
-              <div className="flex-1 overflow-y-auto p-4">
+              <div className="flex-1 min-h-0 overflow-y-auto p-4">
                 {items.length === 0 ? (
                   <div className="text-center text-gray-500 mt-8">
                     <FaShoppingCart className="text-6xl mx-auto mb-4 opacity-50" />
@@ -384,6 +382,11 @@ export default function FloatingCart() {
                         />
                         <div className="flex-1">
                           <h3 className="font-medium text-sm">{item.nombre}</h3>
+                          {item.esDobleGusto && (
+                            <p className="text-xs text-gray-500">
+                              {item.gustos[0].nombre} & {item.gustos[1].nombre}
+                            </p>
+                          )}
                           <p className="text-red-600 font-semibold">${item.precio.toLocaleString()}</p>
                         </div>
                         <div className="flex items-center space-x-2">
@@ -409,7 +412,7 @@ export default function FloatingCart() {
 
               {/* Footer con total y acciones */}
               {items.length > 0 && (
-                <div className="border-t p-4 space-y-4 bg-white">
+                <div className="border-t p-3 sm:p-4 space-y-3 sm:space-y-4 bg-white max-h-[60vh] overflow-y-auto">
                   <div className="flex justify-between items-center text-lg font-semibold">
                     <span>Subtotal:</span>
                     <span className="text-red-600">${totalPrice.toLocaleString()}</span>
@@ -437,6 +440,18 @@ export default function FloatingCart() {
                       value={nombreCliente}
                       onChange={(e) => setNombreCliente(e.target.value)}
                       placeholder="Ej: Juan Pérez"
+                      className="w-full border rounded-lg px-3 py-2 text-gray-700 focus:outline-none focus:ring-2 focus:ring-red-500"
+                    />
+                  </div>
+
+                  {/* Teléfono del cliente */}
+                  <div className="text-sm font-semibold">
+                    <label className="block mb-1">Número de teléfono:</label>
+                    <input
+                      type="tel"
+                      value={telefonoCliente}
+                      onChange={(e) => setTelefonoCliente(e.target.value)}
+                      placeholder="Ej: 3624123456"
                       className="w-full border rounded-lg px-3 py-2 text-gray-700 focus:outline-none focus:ring-2 focus:ring-red-500"
                     />
                   </div>
@@ -485,9 +500,12 @@ export default function FloatingCart() {
                       {cargandoEnvio && (
                         <p className="text-xs text-blue-600">Calculando costo de envío...</p>
                       )}
-                      {costoEnvio > 0 && !cargandoEnvio && (
+                      {errorDistancia && (
+                        <p className="text-xs text-red-600">{errorDistancia}</p>
+                      )}
+                      {costoEnvio > 0 && !cargandoEnvio && !errorDistancia && (
                         <p className="text-xs text-green-600">
-                          Costo de envío: ${costoEnvio.toLocaleString()}
+                          Costo de envío: ${costoEnvio.toLocaleString()} ({distanciaKm.toFixed(1)} km)
                         </p>
                       )}
                     </div>
@@ -506,21 +524,26 @@ export default function FloatingCart() {
                   </div>
 
                   {/* Botones */}
-                  <div className="space-y-2">
+                  <div className="space-y-2 pt-2 border-t bg-white sticky bottom-0">
                     <button 
                       onClick={sendWhatsAppOrder}
-                      disabled={guardandoPedido}
-                      className="w-full bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 transition-colors font-semibold flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+                      disabled={guardandoPedido || cargandoEnvio || (metodoEntrega === "envio" && (errorDistancia || costoEnvio === 0))}
+                      className="w-full bg-green-600 text-white py-4 sm:py-3 rounded-lg hover:bg-green-700 transition-colors font-semibold flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed text-base"
                     >
                       {guardandoPedido ? (
                         <>
                           <FaSpinner className="mr-2 text-xl animate-spin" />
-                          <span>Guardando pedido...</span>
+                          <span>Procesando pedido...</span>
+                        </>
+                      ) : cargandoEnvio ? (
+                        <>
+                          <FaSpinner className="mr-2 text-xl animate-spin" />
+                          <span>Calculando envío...</span>
                         </>
                       ) : (
                         <>
-                          <FaWhatsapp className="mr-2 text-xl" />
-                          <span>Enviar pedido por WhatsApp</span>
+                          <FaShoppingCart className="mr-2 text-xl" />
+                          <span>Confirmar pedido</span>
                         </>
                       )}
                     </button>
@@ -554,6 +577,83 @@ export default function FloatingCart() {
           >
             {notificacion.mensaje}
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Página de Confirmación */}
+      <AnimatePresence>
+        {pedidoConfirmado && (
+          <>
+            {/* Overlay */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black bg-opacity-60 z-[70]"
+            />
+
+            {/* Modal de Confirmación */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="fixed inset-0 z-[80] flex items-center justify-center p-4"
+            >
+              <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-8 text-center">
+                {/* Ícono de éxito */}
+                <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-6">
+                  <motion.div
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    transition={{ delay: 0.2, type: "spring", stiffness: 150 }}
+                  >
+                    <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                  </motion.div>
+                </div>
+
+                {/* Título */}
+                <h2 className="text-2xl font-bold text-gray-900 mb-4">
+                  ¡Pedido Confirmado!
+                </h2>
+
+                {/* Información del pedido */}
+                <div className="bg-gray-50 rounded-lg p-4 mb-6">
+                  <div className="text-lg font-semibold text-red-600 mb-2">
+                    Pedido #{pedidoConfirmado.numeroOrden}
+                  </div>
+                  <div className="text-gray-700 text-sm space-y-1">
+                    <div>Cliente: {pedidoConfirmado.nombre}</div>
+                    <div>Total: ${pedidoConfirmado.total.toLocaleString()}</div>
+                  </div>
+                </div>
+
+                {/* Mensaje */}
+                <div className="text-gray-600 mb-6 leading-relaxed">
+                  <p className="mb-3">
+                    Tu pedido ha sido registrado exitosamente.
+                  </p>
+                  <p className="text-sm">
+                    Nos estaremos comunicando al número <strong>{pedidoConfirmado.telefono}</strong> para confirmar y coordinar la entrega de tu pedido.
+                  </p>
+                </div>
+
+                {/* Botón */}
+                <button
+                  onClick={cerrarConfirmacion}
+                  className="w-full bg-red-600 text-white py-3 px-6 rounded-lg hover:bg-red-700 transition-colors font-semibold"
+                >
+                  Entendido
+                </button>
+
+                {/* Nota adicional */}
+                <p className="text-xs text-gray-500 mt-4">
+                  ¡Gracias por elegir La Que Va! 🍕
+                </p>
+              </div>
+            </motion.div>
+          </>
         )}
       </AnimatePresence>
     </>

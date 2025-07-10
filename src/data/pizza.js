@@ -50,7 +50,7 @@ export const pizza = [
   },
   {
     id: 8,
-    nombre: "2 MUZZA",
+    nombre: "PROMO 2 MUZZA",
     ingredientes: ["2 Pizzas Muzzarella"],
     precio: 10000,
     imagen: "pizzas/pizza-4.webp",
@@ -59,7 +59,7 @@ export const pizza = [
   },
   {
     id: 9,
-    nombre: "1 MUZZA + 1 ESPECIAL",
+    nombre: "PROMO 1 MUZZA + 1 ESPECIAL",
     ingredientes: ["1 Pizza Muzzarella", "1 Pizza Especial"],
     precio: 12000,
     imagen: "pizzas/pizza-4.webp",
@@ -68,7 +68,7 @@ export const pizza = [
   },
   {
     id: 10,
-    nombre: "1 NAPO + 1 FUGA",
+    nombre: "PROMO 1 NAPO + 1 FUGA",
     ingredientes: ["1 Pizza Napolitana", "1 Pizza Fugazzeta"],
     precio: 12000,
     imagen: "pizzas/pizza-4.webp",
@@ -77,7 +77,7 @@ export const pizza = [
   },
   {
     id: 11,
-    nombre: "1 NAPO + 1 FUGA (CON JAMÓN)",
+    nombre: "PROMO 1 NAPO + 1 FUGA (CON JAMÓN)",
     ingredientes: ["1 Pizza Napolitana con Jamón", "1 Pizza Fugazzeta con Jamón"],
     precio: 13000,
     imagen: "pizzas/pizza-4.webp",

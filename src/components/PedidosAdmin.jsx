@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { 
   obtenerPedidosPorEstado,
   obtenerPedidosPendientes,
@@ -7,9 +7,10 @@ import {
   confirmarPedido,
   cancelarPedido,
   obtenerVentasHoy,
-  imprimirComanda
+  imprimirComanda,
+  enviarConfirmacionWhatsApp
 } from "../firebase/pedidos";
-import { FaCheck, FaTimes, FaClock, FaSpinner, FaPrint, FaExclamationTriangle } from "react-icons/fa";
+import { FaCheck, FaTimes, FaClock, FaSpinner, FaPrint, FaExclamationTriangle, FaWhatsapp } from "react-icons/fa";
 
 export default function PedidosAdmin() {
   const [pestanaActiva, setPestanaActiva] = useState("pendientes");
@@ -17,17 +18,38 @@ export default function PedidosAdmin() {
   const [ventasHoy, setVentasHoy] = useState(null);
   const [cargando, setCargando] = useState(true);
   const [procesando, setProcesando] = useState({});
+  const [cantidadPedidosAnterior, setCantidadPedidosAnterior] = useState(-1); // Inicializar con -1 para detectar la primera carga
+  const [audioIniciado, setAudioIniciado] = useState(false);
 
   // Cargar datos al montar el componente y cuando cambie la pestaña
   useEffect(() => {
     cargarDatos();
   }, [pestanaActiva]);
 
-  // Auto-recargar cada 30 segundos
+  // Auto-verificar nuevos pedidos cada 10 segundos (sin recargar la página completa)
   useEffect(() => {
-    const interval = setInterval(cargarDatos, 30000);
+    const interval = setInterval(async () => {
+      if (audioIniciado && pestanaActiva === "pendientes") {
+        try {
+          const pedidosData = await obtenerPedidosPendientes();
+          const nuevaCantidad = pedidosData.length;
+          
+          // Solo detectar nuevos pedidos si hay aumento
+          if (cantidadPedidosAnterior >= 0 && nuevaCantidad > cantidadPedidosAnterior) {
+            reproducirSonidoNotificacion();
+            // Actualizar la lista de pedidos sin recargar toda la página
+            setPedidos(pedidosData);
+          }
+          
+          // Actualizar la cantidad anterior
+          setCantidadPedidosAnterior(nuevaCantidad);
+        } catch (error) {
+          console.error('Error verificando nuevos pedidos:', error);
+        }
+      }
+    }, 10000);
     return () => clearInterval(interval);
-  }, [pestanaActiva]);
+  }, [audioIniciado, pestanaActiva, cantidadPedidosAnterior]);
 
   const cargarDatos = async () => {
     setCargando(true);
@@ -56,6 +78,19 @@ export default function PedidosAdmin() {
         setVentasHoy(ventasData);
       }
       
+      // Detectar nuevos pedidos pendientes solo en carga manual/inicial
+      if (pestanaActiva === "pendientes") {
+        const nuevaCantidad = pedidosData.length;
+        
+        // Si es la primera carga (cantidadPedidosAnterior es -1), solo establecer la cantidad base
+        if (cantidadPedidosAnterior === -1) {
+          setCantidadPedidosAnterior(nuevaCantidad);
+        } else {
+          // En cargas manuales, actualizar sin reproducir sonido (el sonido se maneja en el intervalo)
+          setCantidadPedidosAnterior(nuevaCantidad);
+        }
+      }
+      
       setPedidos(pedidosData);
     } catch (error) {
       console.error("Error cargando datos:", error);
@@ -71,7 +106,12 @@ export default function PedidosAdmin() {
       const resultado = await confirmarPedido(pedidoId);
       if (resultado.success) {
         // Quitar el pedido de la lista de pendientes
-        setPedidos(prev => prev.filter(pedido => pedido.id !== pedidoId));
+        setPedidos(prev => {
+          const nuevosPedidos = prev.filter(pedido => pedido.id !== pedidoId);
+          // Actualizar el contador para reflejar la nueva cantidad
+          setCantidadPedidosAnterior(nuevosPedidos.length);
+          return nuevosPedidos;
+        });
       }
     } catch (error) {
       console.error("Error confirmando pedido:", error);
@@ -91,7 +131,14 @@ export default function PedidosAdmin() {
       const resultado = await cancelarPedido(pedidoId);
       if (resultado.success) {
         // Quitar el pedido de la lista actual
-        setPedidos(prev => prev.filter(pedido => pedido.id !== pedidoId));
+        setPedidos(prev => {
+          const nuevosPedidos = prev.filter(pedido => pedido.id !== pedidoId);
+          // Si estamos en pendientes, actualizar el contador
+          if (pestanaActiva === "pendientes") {
+            setCantidadPedidosAnterior(nuevosPedidos.length);
+          }
+          return nuevosPedidos;
+        });
       }
     } catch (error) {
       console.error("Error cancelando pedido:", error);
@@ -126,6 +173,62 @@ export default function PedidosAdmin() {
     { id: "cancelados", label: "Pedidos Cancelados", icon: FaTimes }
   ];
 
+  // Función para reproducir sonido de notificación
+  const reproducirSonidoNotificacion = () => {
+    try {
+      const audio = new Audio('/wow.mp3');
+      audio.volume = 0.8; // Volumen al 80%
+      
+      // Promesa para manejar la reproducción
+      const playPromise = audio.play();
+      
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => {
+            // Sonido reproducido exitosamente
+          })
+          .catch(error => {
+            console.error('Error reproduciendo sonido:', error);
+            // Intentar de nuevo con un audio nuevo
+            setTimeout(() => {
+              try {
+                const audioBackup = new Audio('/wow.mp3');
+                audioBackup.volume = 0.8;
+                audioBackup.play();
+              } catch (e) {
+                console.error('Error en segundo intento:', e);
+              }
+            }, 100);
+          });
+      }
+    } catch (error) {
+      console.error('Error creando audio:', error);
+    }
+  };
+
+  // Función para inicializar el audio con interacción del usuario
+  const inicializarAudio = () => {
+    if (!audioIniciado) {
+      setAudioIniciado(true);
+      
+      // Reproducir sonido silencioso para inicializar
+      try {
+        const audio = new Audio('/wow.mp3');
+        audio.volume = 0.01; // Muy bajo pero no 0
+        audio.play()
+          .then(() => {
+            audio.pause();
+            audio.currentTime = 0;
+          })
+          .catch(() => {
+            // Audio no se pudo inicializar automáticamente
+          });
+      } catch (error) {
+        console.error('Error inicializando audio:', error);
+      }
+    }
+  };
+
   if (cargando) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -135,10 +238,10 @@ export default function PedidosAdmin() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto p-6">
+    <div className="max-w-6xl mx-auto p-4" onClick={inicializarAudio}>
       {/* Estadísticas del día - solo en pendientes */}
       {pestanaActiva === "pendientes" && ventasHoy && (
-        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+        <div className="bg-white rounded-lg shadow-md p-4 mb-4">
           <h2 className="text-xl font-bold text-red-600 mb-4">Ventas de Hoy</h2>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="text-center">
@@ -169,11 +272,26 @@ export default function PedidosAdmin() {
         </div>
       )}
 
+      {/* Indicador de sonido habilitado */}
+      {!audioIniciado ? (
+        <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded mb-4">
+          <p className="text-sm">
+            🔊 <strong>Haz clic en cualquier lugar</strong> para habilitar las notificaciones de sonido cuando lleguen nuevos pedidos.
+          </p>
+        </div>
+      ) : (
+        <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4">
+          <p className="text-sm">
+            ✅ <strong>Notificaciones de sonido activadas</strong> - Recibirás una alerta sonora cuando lleguen nuevos pedidos.
+          </p>
+        </div>
+      )}
+
       {/* Panel de pestañas */}
       <div className="bg-white rounded-lg shadow-md">
         {/* Pestañas */}
         <div className="border-b border-gray-200">
-          <nav className="flex space-x-8 px-6">
+          <nav className="flex space-x-8 px-4">
             {pestanas.map((pestana) => {
               const Icon = pestana.icon;
               const esActiva = pestanaActiva === pestana.id;
@@ -181,7 +299,10 @@ export default function PedidosAdmin() {
               return (
                 <button
                   key={pestana.id}
-                  onClick={() => setPestanaActiva(pestana.id)}
+                  onClick={() => {
+                    setPestanaActiva(pestana.id);
+                    inicializarAudio();
+                  }}
                   className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
                     esActiva
                       ? "border-red-500 text-red-600"
@@ -199,17 +320,28 @@ export default function PedidosAdmin() {
         </div>
 
         {/* Contenido de la pestaña */}
-        <div className="p-6">
-          <div className="flex items-center justify-between mb-6">
+        <div className="p-4">
+          <div className="flex items-center justify-between mb-4">
             <h1 className="text-2xl font-bold text-red-600">
               {pestanas.find(p => p.id === pestanaActiva)?.label} ({pedidos.length})
             </h1>
-            <button
-              onClick={cargarDatos}
-              className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors"
-            >
-              Actualizar
-            </button>
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  console.log('🔄 Recarga manual iniciada...');
+                  cargarDatos();
+                }}
+                className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors flex items-center"
+              >
+                🔄 Actualizar
+                {audioIniciado && (
+                  <span className="ml-2 text-xs bg-green-500 px-2 py-1 rounded">
+                    🔊
+                  </span>
+                )}
+              </button>
+            </div>
           </div>
 
           {pedidos.length === 0 ? (
@@ -224,7 +356,7 @@ export default function PedidosAdmin() {
           ) : (
             <div className="divide-y divide-gray-200">
               {pedidos.map((pedido) => (
-                <div key={pedido.id} className="py-6">
+                <div key={pedido.id} className="py-4">
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center space-x-4">
                       <h3 className="text-lg font-semibold">
@@ -239,26 +371,29 @@ export default function PedidosAdmin() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {/* Información del cliente */}
                     <div>
                       <h4 className="font-semibold mb-2">Cliente</h4>
                       <p className="text-gray-700">{pedido.cliente.nombre}</p>
+                      {pedido.cliente.telefono && (
+                        <p className="text-gray-600 text-sm">{pedido.cliente.telefono}</p>
+                      )}
                       
-                      <h4 className="font-semibold mt-4 mb-2">Entrega</h4>
+                      <h4 className="font-semibold mt-3 mb-2">Entrega</h4>
                       <p className="text-gray-700">
-                        {pedido.entrega.tipo === "retiro" ? "Retiro en Paseo Sur" : "Envío a domicilio"}
+                        {pedido.entrega.tipo === "retiro" ? "Retiro en LOCAL" : "Envío a domicilio"}
                       </p>
                       {pedido.entrega.tipo === "envio" && (
                         <p className="text-gray-600 text-sm">{pedido.entrega.direccion}</p>
                       )}
 
-                      <h4 className="font-semibold mt-4 mb-2">Pago</h4>
+                      <h4 className="font-semibold mt-3 mb-2">Pago</h4>
                       <p className="text-gray-700 capitalize">{pedido.pago.metodo}</p>
                       
                       {pedido.notas && (
                         <>
-                          <h4 className="font-semibold mt-4 mb-2">Notas</h4>
+                          <h4 className="font-semibold mt-3 mb-2">Notas</h4>
                           <p className="text-gray-700 text-sm">{pedido.notas}</p>
                         </>
                       )}
@@ -270,13 +405,27 @@ export default function PedidosAdmin() {
                       <div className="space-y-2">
                         {pedido.items.map((item, index) => (
                           <div key={index} className="flex justify-between text-sm">
-                            <span>{item.cantidad}x {item.nombre}</span>
+                            <div className="flex-1">
+                              <div className="flex items-center">
+                                <span>{item.cantidad}x {item.nombre}</span>
+                                {item.esPromo && (
+                                  <span className="ml-2 text-xs bg-orange-100 text-orange-800 px-2 py-1 rounded">
+                                    PROMO
+                                  </span>
+                                )}
+                              </div>
+                              {item.esDobleGusto && item.gustos && item.gustos.length === 2 && (
+                                <div className="text-xs text-gray-600 ml-2">
+                                  ({item.gustos[0].nombre} & {item.gustos[1].nombre})
+                                </div>
+                              )}
+                            </div>
                             <span>${(item.precio * item.cantidad).toLocaleString()}</span>
                           </div>
                         ))}
                       </div>
                       
-                      <div className="border-t mt-4 pt-4">
+                      <div className="border-t mt-3 pt-3">
                         <div className="flex justify-between font-semibold">
                           <span>Subtotal:</span>
                           <span>${pedido.resumen.subtotal.toLocaleString()}</span>
@@ -299,7 +448,7 @@ export default function PedidosAdmin() {
                   </div>
 
                   {/* Botones de acción */}
-                  <div className="mt-6 flex flex-wrap gap-2">
+                  <div className="mt-4 flex flex-wrap gap-2">
                     {/* Botón de imprimir comanda - siempre disponible excepto en cancelados */}
                     {pestanaActiva !== "cancelados" && (
                       <button
@@ -311,20 +460,31 @@ export default function PedidosAdmin() {
                       </button>
                     )}
 
+                    {/* Botón de confirmación por WhatsApp - disponible en pendientes y confirmados */}
+                    {pestanaActiva !== "cancelados" && (
+                      <button
+                        onClick={() => enviarConfirmacionWhatsApp(pedido)}
+                        className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center"
+                      >
+                        <FaWhatsapp className="mr-2" />
+                        Confirmar por WhatsApp
+                      </button>
+                    )}
+
                     {/* Botones específicos por estado */}
                     {pestanaActiva === "pendientes" && (
                       <>
                         <button
                           onClick={() => manejarConfirmarPedido(pedido.id)}
                           disabled={procesando[pedido.id]}
-                          className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center disabled:opacity-50"
+                          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center disabled:opacity-50"
                         >
                           {procesando[pedido.id] === "confirmando" ? (
                             <FaSpinner className="animate-spin mr-2" />
                           ) : (
                             <FaCheck className="mr-2" />
                           )}
-                          Confirmar Pedido
+                          Marcar como Confirmado
                         </button>
                         
                         <button

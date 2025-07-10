@@ -2,6 +2,7 @@ import { useRef } from "react";
 import { motion, useInView } from "framer-motion";
 import { CartProvider } from '../context/CartContext';
 import Card from "./Card.jsx";
+import DobleGusto from "./DobleGusto.jsx";
 import FloatingCart from "./FloatingCart.jsx";
 import { pizza } from "../data/pizza.js";
 
@@ -46,6 +47,10 @@ export default function PizzaSlider() {
           className="w-full max-w-4xl mx-auto"
         >
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 pb-20">
+            {/* Card especial para doble gusto */}
+            <DobleGusto index={0} />
+            
+            {/* Cards normales de pizzas */}
             {pizza.map((item, index) => (
               <motion.div
                 key={item.id}
@@ -53,11 +58,11 @@ export default function PizzaSlider() {
                 animate={isInView ? { y: 0, opacity: 1, scale: 1 } : { y: 50, opacity: 0, scale: 0.9 }}
                 transition={{ 
                   duration: 0.5, 
-                  delay: 0.2 + (index * 0.1),
+                  delay: 0.2 + ((index + 1) * 0.1), // +1 para compensar la card de doble gusto
                   ease: "easeOut"
                 }}
               >
-                <Card pizza={item} index={index} />
+                <Card pizza={item} index={index + 1} />
               </motion.div>
             ))}
           </div>
